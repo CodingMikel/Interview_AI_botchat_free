@@ -1,0 +1,7 @@
+llamaapi
+openai
+groq
+python-dotenv
+streamlit
+langchain
+langchain-groq
