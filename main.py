@@ -12,11 +12,10 @@ load_dotenv()
 groq_api_key = os.environ['GROQ_API_KEY']
 
 def generate_questions(conversation, memory, groq_chat, job_description):
-    # Generate interview questions for the HR bot
     job_description_summary = JOB_DESCRIPTION
-    response = conversation.run(f"Consider the following job description summary:\n{job_description_summary}\nGenerate interview questions one by one for a Data Engineer position.")
-    memory.save_context({'input': f"Consider the following job description summary:\n{job_description_summary}\nGenerate interview questions one by one for a Data Engineer position."}, {'output': response})
-    st.write("HR Bot:\n", response)
+    response = conversation.run(f"Consider the following job description summary:\n{job_description_summary}\nGenerate 1 interview questions for a Data Engineer position.")
+    memory.save_context({'input': f"Consider the following job description summary:\n{job_description_summary}\nGenerate 1 interview questions for a Data Engineer position."}, {'output': response})
+    st.write("HR Bot:", response)
 
 def main():
     st.title("Groq Chat App")
@@ -31,41 +30,41 @@ def main():
 
     memory = ConversationBufferWindowMemory(k=conversational_memory_length)
 
-    # Initialize Groq Langchain chat object
     groq_chat = ChatGroq(groq_api_key=groq_api_key, model_name=model)
 
-    # Initialize ConversationChain with Groq chat and memory
     conversation = ConversationChain(llm=groq_chat, memory=memory)
 
-    # Retrieve chat history from session state, if available
     if 'chat_history' not in st.session_state:
         st.session_state.chat_history = []
+    else:
+        for message in st.session_state.chat_history:
+            memory.save_context({'input': message[0]['human']}, {'output': message[0]['AI']})
 
-    # Display conversation history
-    st.write("Conversation History:")
-    for message in st.session_state.chat_history:
-        st.write(f"{message['role']}: {message['content']}")
-
-    # Generate interview questions for the HR bot
     generate_questions(conversation, memory, groq_chat, JOB_DESCRIPTION)
 
-    # Process user's answer
     user_answer = st.text_area("Answer a question:")
     if user_answer:
         response = conversation(user_answer)
-        message = {
-            "role": "You",
-            "content": user_answer
-        }
+        message = [
+            {"AI": response["response"], "human": user_answer},
+            {
+                "role": "system",
+                "content": "You are continuing the interview conversation with the candidate.",
+            },
+        ]
         st.session_state.chat_history.append(message)
-
-        bot_response = {
-            "role": "Chatbot",
-            "content": response["response"]
-        }
-        st.session_state.chat_history.append(bot_response)
-
         st.write("Chatbot:", response["response"])
+
+        # Check if it's the endpoint of the interview
+        if should_end_interview(response):
+            st.write("Interview endpoint reached. Thank you!")
+
+def should_end_interview(response):
+    end_phrases = ["Thank you for your time", "We have completed the interview", "This concludes the interview"]
+    for phrase in end_phrases:
+        if phrase.lower() in response["response"].lower():
+            return True
+    return False
 
 
 JOB_DESCRIPTION = """
